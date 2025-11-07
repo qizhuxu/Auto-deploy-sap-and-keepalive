@@ -51,8 +51,8 @@ on:
 
 env:
   DOCKER_IMAGE: ${{ secrets.DOCKER_IMAGE || 'ghcr.io/sillytavern/sillytavern:latest' }}
-  MEMORY: ${{ secrets.MEMORY || '2048M' }}
-  DISK: ${{ secrets.DISK || '3096M' }}
+  MEMORY: ${{ secrets.MEMORY || '1024M' }}
+  DISK: ${{ secrets.DISK || '2048M' }}
 
 jobs:
   deploy-app:
