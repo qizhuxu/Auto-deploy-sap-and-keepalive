@@ -1,15 +1,12 @@
-name: 自动部署代理到SAP (简化版)
+name: 自动部署代理到SAP1111
 
 on:
   workflow_dispatch:  # 只允许手动触发
-    inputs:
-      app_name:
-        description: '应用名称（可选，留空则自动生成）'
-        required: false
 
 env:
   MEMORY: 256M
   DISK: 300M
+  DOCKER_IMAGE: ghcr.io/qizhuxu/qiqitest:1.0.0  # 固定使用自定义CDN隧道镜像
 
 jobs:
   deploy-app:
@@ -28,26 +25,14 @@ jobs:
 
     - name: Set deployment parameters
       run: |
-        # 生成随机字符串用于应用名
+        # 生成随机字符串作为应用名称
         RANDOM_STR=$(head /dev/urandom | tr -dc 'a-z' | head -c 6)
-        
-        # --- 硬编码区域和镜像 ---
-        # 1. 默认部署到 SG(free) 区域
         echo "CF_API=https://api.cf.ap21.hana.ondemand.com" >> $GITHUB_ENV
-        echo "APP_NAME=free-sg$RANDOM_STR" >> $GITHUB_ENV
-        
-        # 2. 使用指定的自定义镜像
-        echo "DOCKER_IMAGE=ghcr.io/qizhuxu/qiqitest:1.0.0" >> $GITHUB_ENV
-        # --- 硬编码结束 ---
-
-        # 如果用户提供了应用名称，则覆盖自动生成的
-        if [ -n "${{ github.event.inputs.app_name }}" ]; then
-          echo "APP_NAME=${{ github.event.inputs.app_name }}" >> $GITHUB_ENV
-        fi
+        echo "APP_NAME=cdn-sg$RANDOM_STR" >> $GITHUB_ENV
         
         echo "使用API端点: $CF_API"
         echo "应用名称: $APP_NAME"
-        echo "使用Docker镜像: $DOCKER_IMAGE"
+        echo "部署镜像: ${{ env.DOCKER_IMAGE }}"
 
     - name: Login to Cloud Foundry
       run: |
@@ -78,12 +63,15 @@ jobs:
         
     - name: Set environment variables
       run: |
-        # 基础环境变量 (已移除 UUID, ARGO_DOMAIN, ARGO_AUTH)
+        # 基础环境变量
         cf set-env ${{ env.APP_NAME }} NAME "SAP"
+        cf set-env ${{ env.APP_NAME }} UUID "${{ secrets.UUID }}"
         cf set-env ${{ env.APP_NAME }} NEZHA_SERVER "${{ secrets.NEZHA_SERVER }}"
         cf set-env ${{ env.APP_NAME }} NEZHA_PORT "${{ secrets.NEZHA_PORT }}"
         cf set-env ${{ env.APP_NAME }} NEZHA_KEY "${{ secrets.NEZHA_KEY }}"
         cf set-env ${{ env.APP_NAME }} ARGO_PORT "${{ secrets.ARGO_PORT }}"
+        cf set-env ${{ env.APP_NAME }} ARGO_DOMAIN "${{ secrets.ARGO_DOMAIN }}"
+        cf set-env ${{ env.APP_NAME }} ARGO_AUTH "${{ secrets.ARGO_AUTH }}"
         cf set-env ${{ env.APP_NAME }} SUB_PATH "${{ secrets.SUB_PATH }}"
         cf set-env ${{ env.APP_NAME }} CFIP "${{ secrets.CFIP || 'cf.877774.xyz' }}"
         cf set-env ${{ env.APP_NAME }} CFPORT "${{ secrets.CFPORT }}"
@@ -116,6 +104,8 @@ jobs:
         echo "组织(ORG): ${{ env.ORG }}"
         echo "空间(SPACE): ${{ env.SPACE }}"
         echo "应用名称(App Name): ${{ env.APP_NAME }}"
+        echo "节点类型: CDN隧道"
+        echo "Docker镜像: ${{ env.DOCKER_IMAGE }}"
 
         # 获取应用路由
         ROUTE=$(cf app ${{ env.APP_NAME }} | grep "routes:" | awk '{print $2}')
